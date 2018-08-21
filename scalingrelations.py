@@ -1,4 +1,3 @@
-import atpy
 import numpy as np
 import matplotlib
 matplotlib.use('TkAgg')
@@ -7,6 +6,8 @@ import emcee
 import corner
 from scipy import special
 import pandas as pd
+from astropy.io import fits
+from astropy.table import Table
 
 # FUNCTIONS ############################################################################################################
 
@@ -132,7 +133,7 @@ def shading_linear(sampler_input, samples_input, x_input):
     y_fits = np.array(y_fits)
     y_max = []
     y_min = []
-    for i in range(len(xsc)): # for each x interval, find max and min of fits to shade between
+    for i in range(len(x_input)): # for each x interval, find max and min of fits to shade between
         y_max.append(max(y_fits[:, i]))
         y_min.append(min(y_fits[:, i]))
     y_max = np.array(y_max)
@@ -141,57 +142,64 @@ def shading_linear(sampler_input, samples_input, x_input):
 
 
 # Sorting xCOLD GASS data:
-def sort_xCOLDGASS(catalogue, x):
+def sort_xCOLDGASS():
+    # loading data:
+    xCOLDGASS = fits.open('xCOLDGASS_PubCat.fits')
+    xCOLDGASS = Table(xCOLDGASS[1].data).to_pandas()
+    flag_CO = xCOLDGASS['FLAG_CO'].values
+    sfr = xCOLDGASS['LOGSFR_BEST'].values
+    sfr_err = xCOLDGASS['LOGSFR_ERR'].values
     # defining an array of MH2 for both detections and non detections:
-    indUpperLimit = np.where(catalogue.FLAG_CO == 2)  # indices for galaxies with upper limits
-    indNoUpperLimit = np.where(catalogue.FLAG_CO == 1)  # indices for galaxies with upper limits
-    mass_H2 = np.zeros(len(catalogue), dtype=float)
-    mass_H2[indNoUpperLimit] = catalogue.LOGMH2[indNoUpperLimit]
-    mass_H2[indUpperLimit] = catalogue.LIM_LOGMH2[indUpperLimit]  # total list of MH2 mass, including upper limits
+    indUpperLimit = np.where(flag_CO == 2)  # indices for galaxies with upper limits
+    indNoUpperLimit = np.where(flag_CO == 1)  # indices for galaxies with upper limits
+    mass_H2 = np.zeros(len(xCOLDGASS), dtype=float)
+    mass_H2[indNoUpperLimit] = xCOLDGASS['LOGMH2'].values[indNoUpperLimit]
+    mass_H2[indUpperLimit] = xCOLDGASS['LIM_LOGMH2'].values[indUpperLimit]  # total list of MH2 mass, including upper limits
     # defining array for error in MH2, including 1sigma error for upper limits:
-    error_H2 = np.zeros(len(catalogue), dtype=float)
-    error_H2[indNoUpperLimit] = catalogue.LOGMH2_ERR[indNoUpperLimit]
+    error_H2 = np.zeros(len(xCOLDGASS), dtype=float)
+    error_H2[indNoUpperLimit] = xCOLDGASS['LOGMH2_ERR'].values[indNoUpperLimit]
     error_H2[indUpperLimit] = 0.14 # 1sigma error for upper limits
     # defining indices:
-    ind_xcg = np.where((catalogue.LOGSFR_BEST > -6) & (catalogue.LOGSFR_BEST < 6) & (mass_H2 > 4) & (mass_H2 < 20))
-    indxcg_det = np.where((catalogue.LOGSFR_BEST > -6) & (catalogue.LOGSFR_BEST < 6) &
-                          (mass_H2 > 4) & (mass_H2 < 20) & (catalogue.FLAG_CO == 1))
-    indxcg_nondet = np.where((catalogue.LOGSFR_BEST > -6) & (catalogue.LOGSFR_BEST < 6) &
-                             (mass_H2 > 4) & (mass_H2 < 20) & (catalogue.FLAG_CO == 2))
+    ind_xcg = np.where((sfr > -6) & (sfr < 6) & (mass_H2 > 4) & (mass_H2 < 20))
+    indxcg_det = np.where((sfr > -6) & (sfr < 6) &
+                          (mass_H2 > 4) & (mass_H2 < 20) & (flag_CO == 1))
+    indxcg_nondet = np.where((sfr > -6) & (sfr < 6) &
+                             (mass_H2 > 4) & (mass_H2 < 20) & (flag_CO == 2))
     # building matrix of x and y errors:
-    S_xcg = S_error(catalogue.LOGSFR_ERR[ind_xcg], error_H2[ind_xcg])
-    flag_CO = catalogue.FLAG_CO
+    S_xcg = S_error(sfr_err[ind_xcg], error_H2[ind_xcg])
+
+    xh2 = np.linspace(-3,2,100)
 
     # running emcee:
     ndim, nwalkers = 3, 100
     initial=np.array([0.7,9.0,-1])
     pos = [initial + 1e-4*np.random.randn(ndim) for i in range(nwalkers)]
     samplerh2 = emcee.EnsembleSampler(nwalkers, ndim, log_probability_SFRMH2,
-                                      args=(catalogue.LOGSFR_BEST[ind_xcg], mass_H2[ind_xcg], S_xcg, flag_CO[ind_xcg]))
+                                      args=(sfr[ind_xcg], mass_H2[ind_xcg], S_xcg, flag_CO[ind_xcg]))
     samplerh2.run_mcmc(pos, 1000)
     samplesh2 = samplerh2.chain[:, 200:, :].reshape((-1, ndim))
     plot_corner_SFRMH2(samplesh2) # plotting corner
     # error shading for fit:
-    shadingh2 = shading_linear(samplerh2, samplesh2, xsc)
+    shadingh2 = shading_linear(samplerh2, samplesh2, xh2)
     # calculating best fit function from medians of samples:
-    ysch2 = linfunc(xsc, np.median(samplesh2[:,0]),np.median(samplesh2[:,1]))
+    ysch2 = linfunc(xh2, np.median(samplesh2[:,0]),np.median(samplesh2[:,1]))
 
     # plotting data and emcee fit results:
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
     fig, ax = plt.subplots(figsize=(8, 8))
-    ax.plot(x, ysch2, color='k', linewidth=1.5, label='Best fit (MCMC)', zorder=2)
-    ax.errorbar(catalogue.LOGSFR_BEST[indxcg_det], mass_H2[indxcg_det], yerr=error_H2[indxcg_det], xerr=catalogue.LOGSFR_ERR[indxcg_det],
+    ax.plot(xh2, ysch2, color='k', linewidth=1.5, label='Best fit (MCMC)', zorder=2)
+    ax.errorbar(sfr[indxcg_det], mass_H2[indxcg_det], yerr=error_H2[indxcg_det], xerr=sfr_err[indxcg_det],
                 fmt='o',
-                markersize=6, linewidth=0.7, mew=1.5, capsize=3,
+                markersize=4, linewidth=0.5, mew=1, capsize=2,
                 capthick=0.5, mec='midnightblue', mfc="cornflowerblue", ecolor='midnightblue',
-                label="xCOLD GASS detections", zorder=4)
-    ax.errorbar(catalogue.LOGSFR_BEST[indxcg_nondet], mass_H2[indxcg_nondet], xerr=catalogue.LOGSFR_ERR[indxcg_nondet], fmt='v', markersize=6,
-                linewidth=0.7,
-                mew=1.5, capsize=3,
+                label="xCOLD GASS detections", zorder=3)
+    ax.errorbar(sfr[indxcg_nondet], mass_H2[indxcg_nondet], xerr=sfr_err[indxcg_nondet], fmt='v', markersize=4,
+                linewidth=0.5,
+                mew=1, capsize=2,
                 capthick=0.5, mec='midnightblue', mfc="cornflowerblue", ecolor='midnightblue',
                 label="xCOLD GASS non-detections", zorder=3)
-    ax.fill_between(x, shadingh2[0], shadingh2[1], facecolor='plum', zorder=1)
+    ax.fill_between(xh2, shadingh2[0], shadingh2[1], facecolor='plum', zorder=1)
     leg = ax.legend(fancybox=True, prop={'size': 12})
     leg.get_frame().set_alpha(1.0)
     ax.set_xlabel("$\mathrm{log\, SFR\, [M_{\odot}\, yr^{-1}]}$", fontsize=16)
@@ -201,17 +209,19 @@ def sort_xCOLDGASS(catalogue, x):
     plt.savefig('sfrH2.pdf', format='pdf', dpi=300, transparent=False)
 
 
-def sort_xGASS(catalogue, x):
-    # loading variables from table
-    sfr_HI = np.log10(catalogue.SFR_best)
-    mass_HI = catalogue.lgMHI
-    flag_HI = catalogue.HIsrc
-    # defining indices:
+def sort_xGASS():
+    # Loading xGASS data:
+    xGASS = fits.open('xxGASS_MASTER_CO_170620_final.fits')
+    xGASS = Table(xGASS[1].data).to_pandas()
+    sfr_HI = np.log10(xGASS['SFR_best'].values)
+    mass_HI = xGASS['lgMHI'].values
+    flag_HI = xGASS['HIsrc'].values
+    # Taking indices:
     ind_xg = np.where((sfr_HI > -6) & (sfr_HI < 6) & (mass_HI > 4) & (mass_HI < 20))
     indxg_det = np.where((sfr_HI > -6) & (sfr_HI < 6) & (mass_HI > 4) & (mass_HI < 20) & (flag_HI != 4))
     indxg_nondet = np.where((sfr_HI > -6) & (sfr_HI < 6) & (mass_HI > 4) & (mass_HI < 20) & (flag_HI == 4))
-    # creating error arrays
-    xerrxg1 = catalogue.SFRerr_best / (catalogue.SFR_best * np.log(10))  # propagating error into log SFR
+    # Creating error arrays:
+    xerrxg1 = np.array(xGASS['SFRerr_best'].values / (xGASS['SFR_best'].values * np.log(10)))  # propagating error into log SFR
     yerrxg1 = np.zeros(len(sfr_HI))
     yerrxg1[indxg_det] = 0.2
     yerrxg1[indxg_nondet] = 0.14  # non-detections errors
@@ -226,26 +236,29 @@ def sort_xGASS(catalogue, x):
                                       args=(sfr_HI[ind_xg], mass_HI[ind_xg], S_xg, flag_HI[ind_xg]))
     samplerHI.run_mcmc(pos, 1000)
     samplesHI = samplerHI.chain[:, 200:, :].reshape((-1, ndim))
-    plot_corner_SFRMHI(samplesHI) # plotting corner
-    yschI = linfunc(xsc, np.median(samplesHI[:, 0]), np.median(samplesHI[:, 1])) # best fit from medians
-    shadinghI = shading_linear(samplerHI, samplesHI, xsc) # shading error region on fit
+    plot_corner_SFRMHI(samplesHI)  # plotting corner
+
+    xHI = np.linspace(-3,2,100)
+
+    yschI = linfunc(xHI, np.median(samplesHI[:, 0]), np.median(samplesHI[:, 1]))  # best fit from medians
+    shadinghI = shading_linear(samplerHI, samplesHI, xHI)  # shading error region on fit
 
     # plotting result:
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
     fig, ax = plt.subplots(figsize=(8, 8))
-    ax.plot(x, yschI, color='k', linewidth=1.5, label='Best fit (MCMC)', zorder=2)
+    ax.plot(xHI, yschI, color='k', linewidth=1.5, label='Best fit (MCMC)', zorder=2)
     ax.errorbar(sfr_HI[indxg_det], mass_HI[indxg_det], yerr=yerrxg1[indxg_det],
                 xerr=xerrxg1[indxg_det], fmt='o',
-                markersize=6, linewidth=0.7, mew=1.5, capsize=3,
+                markersize=4, linewidth=0.7, mew=1, capsize=2,
                 capthick=0.5, mec='midnightblue', mfc="cornflowerblue", ecolor='midnightblue',
-                label="xCOLD GASS detections", zorder=4)
+                label="xCOLD GASS detections", zorder=3)
     ax.errorbar(sfr_HI[indxg_nondet], mass_HI[indxg_nondet], xerr=xerrxg1[indxg_nondet], fmt='v',
-                markersize=6, linewidth=0.7,
-                mew=1.5, capsize=3,
+                markersize=4, linewidth=0.7,
+                mew=1, capsize=2,
                 capthick=0.5, mec='midnightblue', mfc="cornflowerblue", ecolor='midnightblue',
-                label="xCOLD GASS non-detections", zorder=3)
-    ax.fill_between(x, shadinghI[0], shadinghI[1], facecolor='plum', zorder=1)
+                label="xCOLD GASS non-detections", zorder=4)
+    ax.fill_between(xHI, shadinghI[0], shadinghI[1], facecolor='plum', zorder=1)
     leg = ax.legend(fancybox=True, prop={'size': 12})
     leg.get_frame().set_alpha(1.0)
     ax.set_xlabel("$\mathrm{log\, SFR\, [M_{\odot}\, yr^{-1}]}$", fontsize=16)
@@ -287,7 +300,7 @@ def shading_MS(sampler_input, samples_input, x_input):
     y_fits = np.array(y_fits)
     y_max = []
     y_min = []
-    for i in range(len(xsc)):
+    for i in range(len(x_input)):
         y_max.append(max(y_fits[:, i]))
         y_min.append(min(y_fits[:, i]))
     y_max = np.array(y_max)
@@ -306,7 +319,7 @@ def plot_corner_MS(samples_input):
     plt.savefig('MScorner.pdf', format='pdf', dpi=300, transparent=False)
 
 
-def sort_GAMA_starforming(x_input):
+def sort_GAMA_starforming():
     GAMA = pd.read_csv('GAMA_sample.dat', comment='#', header=None, sep=r"\s*", engine="python") # loading GAMA data
     GAMA.columns = ['ID', 'z', 'logM*', 'logM*err', 'logSFR', 'logSFRerr', 'ColorFlag'] # taking columns
     GAMA = GAMA[np.isfinite(GAMA['logSFR'])]
@@ -318,6 +331,8 @@ def sort_GAMA_starforming(x_input):
     mass_sferr = np.array(GAMA['logM*err'])
     sfr_sf = np.array(GAMA['logSFR'])
     sfr_sferr = np.array(GAMA['logSFRerr'])
+
+    xMS = np.linspace(7, 12, 100)  # array of x values for main sequence fit
 
     # creating bins along main sequence:
     bins = np.linspace(7.5, 11, 15)
@@ -337,8 +352,8 @@ def sort_GAMA_starforming(x_input):
     sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability_MS, args=(mass_sf, sfr_sf, mass_sferr, sfr_sferr))
     sampler.run_mcmc(pos, 1000)
     samples = sampler.chain[:, 200:, :].reshape((-1, ndim))
-    shade = shading_MS(sampler, samples, x_input) # creating shading on fit
-    y_new = func(x_input, np.median(samples[:, 0]), np.median(samples[:, 1]), np.median(samples[:, 2])) # best fit
+    shade = shading_MS(sampler, samples, xMS) # creating shading on fit
+    y_new = func(xMS, np.median(samples[:, 0]), np.median(samples[:, 1]), np.median(samples[:, 2])) # best fit
 
     plot_corner_MS(samples) # plotting corner
 
@@ -352,8 +367,8 @@ def sort_GAMA_starforming(x_input):
     ax.errorbar(m_bin, sfr_bin, yerr=err_bin, fmt="o", markersize=6, linewidth=1, mew=1.5, capsize=3,
                 capthick=1, mec='midnightblue', mfc="cornflowerblue", ecolor='midnightblue', label="GAMA binned",
                 zorder=4)
-    ax.plot(x_input, y_new, c="k", linewidth=1.5, label='Best fit (MCMC)', zorder=3)
-    ax.fill_between(x_input, shade[0], shade[1], facecolor='plum', zorder=2)
+    ax.plot(xMS, y_new, c="k", linewidth=1.5, label='Best fit (MCMC)', zorder=3)
+    ax.fill_between(xMS, shade[0], shade[1], facecolor='plum', zorder=2)
     leg = ax.legend(fancybox=True, prop={'size': 14})
     leg.get_frame().set_alpha(1.0)
     ax.set_ylabel("$\mathrm{log\, SFR\, [M_{\odot}\, yr^{-1}]}$", fontsize=16)
@@ -363,14 +378,6 @@ def sort_GAMA_starforming(x_input):
 
 # MAIN PROGRAM #########################################################################################################
 
-# loading xCOLD GASS and xGASS catalogues:
-xcg = atpy.Table('xCOLDGASS_PubCat.fits') # loading xCOLD GASS data
-xg = atpy.Table('xxGASS_MASTER_CO_170620_final.fits') # loading xGASS data
-
-# x-values array:
-xsc = np.linspace(-3,2,100) # array of x values for linear fits
-xsc2 = np.linspace(7, 12, 100) # array of x values for main sequence fit
-
-sort_xCOLDGASS(xcg, xsc)
-sort_xGASS(xg, xsc)
-sort_GAMA_starforming(xsc2)
+sort_xCOLDGASS()
+sort_xGASS()
+sort_GAMA_starforming()
