@@ -26,26 +26,25 @@ def log_prior_SFRMH2(theta):
     return -np.inf
 
 
-def log_probability_SFRMH2(theta, x, y, S, fl):
+def log_probability_SFRMH2(theta, x, y, x2, y2, S, S2):
     m, const, lnf = theta
     v = np.array([-m, 1.0])
-    # finding indices for detections and non-detections:
-    det = np.where(fl == 1)
-    nondet = np.where(fl == 2)
-    # calculating sigma squared for both detections and non detections:
+    # calculating sigma squared for detections:
     sigma2 = np.dot(np.dot(S, v), v) + np.exp(2 * lnf)
-    sigma = sigma2**0.5
-    # calculating difference between value (y) and model, as well as calculating model:
+    # calculating sigma for non-detections:
+    sigma = (np.dot(np.dot(S2, v), v) + np.exp(2 * lnf))**0.5
+    # calculating difference between value (y) and model for detections:
     deltaN = y - (m * x) - const
-    model = (m * x) + const
+    # calculating model for non-detections:
+    model = (m * x2) + const
     # calculating likelihood for all detections:
-    ll1 = -0.5 * np.sum(deltaN[det] ** 2 / sigma2[det] + np.log(sigma2[det]))
+    ll1 = -0.5 * np.sum(deltaN ** 2 / sigma2 + np.log(sigma2))
     # considering non-detections:
-    I = np.zeros(len(nondet[0]))
-    for i in range(0,len(nondet[0])):
+    I = np.zeros(len(x2))
+    for i in range(0,len(x2)):
         # integrate gaussian from 0 mass to upper limit mass for each non-detection:
         I[i] = np.log(((2 * np.pi) ** 0.5) *
-                      0.5 * (special.erf((y[nondet][i] - model[nondet][i]) / ((2 ** 0.5) * sigma[nondet][i])) + 1))
+                      0.5 * (special.erf((y2[i] - model[i]) / ((2 ** 0.5) * sigma[i])) + 1))
         # note1: the root 2pi factor comes from the fact that we ignore this factor in the ll1 likelihood, so we have to
             # account for eliminating this factor on this likelihood calculation as well otherwise we cant add ll1+ll2
         # note2: the error function is used to integrate the Gaussian function within our limits, this significantly
@@ -74,25 +73,23 @@ def log_prior_SFRMHI(theta):
     return -np.inf
 
 
-def log_probability_SFRMHI(theta, x, y, S, fl):
+def log_probability_SFRMHI(theta, x, y, x2, y2, S, S2):
     m, const, lnf = theta
     v = np.array([-m, 1.0])
-    # finding indices for detections and non-detections:
-    det = np.where(fl != 4)
-    nondet = np.where(fl == 4)
-    # calculating sigma squared for both detections and non detections:
+    # calculating sigma squared for detections:
     sigma2 = np.dot(np.dot(S, v), v) + np.exp(2 * lnf)
-    sigma = sigma2**0.5
-    deltaN = y - (m * x) - const
-    model = (m * x) + const
+    # calculating sigma for non-detections:
+    sigma = (np.dot(np.dot(S2, v), v) + np.exp(2 * lnf))**0.5
+    deltaN = y - (m * x) - const # for detections
+    model = (m * x2) + const # for non-detections
     # calculating likelihood for all detections:
-    ll1 = -0.5 * np.sum(deltaN[det] ** 2 / sigma2[det] + np.log(sigma2[det]))
-    I = np.zeros(len(nondet[0]))
+    ll1 = -0.5 * np.sum(deltaN ** 2 / sigma2 + np.log(sigma2))
+    I = np.zeros(len(x2))
     # considering non-detections:
-    for i in range(0,len(nondet[0])):
+    for i in range(0,len(x2)):
         # integrate gaussian from 0 mass to upper limit mass for each non-detection:
         I[i] = np.log(((2 * np.pi) ** 0.5) *
-                      0.5 * (special.erf((y[nondet][i]-model[nondet][i]) / ((2 ** 0.5) * sigma[nondet][i])) + 1))
+                      0.5 * (special.erf((y2[i]-model[i]) / ((2 ** 0.5) * sigma[i])) + 1))
     # calculating likelihood for all non-detections:
     ll2 = np.sum(I)
     return ll1 + ll2 + log_prior_SFRMHI(theta) # combining detection & non detection results
@@ -154,52 +151,50 @@ def sort_xCOLDGASS():
     indNoUpperLimit = np.where(flag_CO == 1)  # indices for galaxies with upper limits
     mass_H2 = np.zeros(len(xCOLDGASS), dtype=float)
     mass_H2[indNoUpperLimit] = xCOLDGASS['LOGMH2'].values[indNoUpperLimit]
-    mass_H2[indUpperLimit] = xCOLDGASS['LIM_LOGMH2'].values[indUpperLimit]  # total list of MH2 mass, including upper limits
+    mass_H2[indUpperLimit] = xCOLDGASS['LIM_LOGMH2'].values[indUpperLimit]
     # defining array for error in MH2, including 1sigma error for upper limits:
     error_H2 = np.zeros(len(xCOLDGASS), dtype=float)
     error_H2[indNoUpperLimit] = xCOLDGASS['LOGMH2_ERR'].values[indNoUpperLimit]
     error_H2[indUpperLimit] = 0.14 # 1sigma error for upper limits
     # defining indices:
-    ind_xcg = np.where((sfr > -6) & (sfr < 6) & (mass_H2 > 4) & (mass_H2 < 20))
-    indxcg_det = np.where((sfr > -6) & (sfr < 6) &
-                          (mass_H2 > 4) & (mass_H2 < 20) & (flag_CO == 1))
-    indxcg_nondet = np.where((sfr > -6) & (sfr < 6) &
-                             (mass_H2 > 4) & (mass_H2 < 20) & (flag_CO == 2))
+    ind_det = np.where((sfr > -6) & (mass_H2 > 6) & (flag_CO == 1))
+    ind_nondet = np.where((sfr > -6) & (mass_H2 > 6) & (flag_CO == 2))
     # building matrix of x and y errors:
-    S_xcg = S_error(sfr_err[ind_xcg], error_H2[ind_xcg])
+    S_det = S_error(sfr_err[ind_det], error_H2[ind_det])
+    S_nondet = S_error(sfr_err[ind_nondet], error_H2[ind_nondet])
 
-    xh2 = np.linspace(-3,2,100)
+    x_scale = np.linspace(-3,2,100)
 
     # running emcee:
     ndim, nwalkers = 3, 100
     initial=np.array([0.7,9.0,-1])
     pos = [initial + 1e-4*np.random.randn(ndim) for i in range(nwalkers)]
-    samplerh2 = emcee.EnsembleSampler(nwalkers, ndim, log_probability_SFRMH2,
-                                      args=(sfr[ind_xcg], mass_H2[ind_xcg], S_xcg, flag_CO[ind_xcg]))
-    samplerh2.run_mcmc(pos, 1000)
-    samplesh2 = samplerh2.chain[:, 200:, :].reshape((-1, ndim))
-    plot_corner_SFRMH2(samplesh2) # plotting corner
-    # error shading for fit:
-    shadingh2 = shading_linear(samplerh2, samplesh2, xh2)
-    # calculating best fit function from medians of samples:
-    ysch2 = linfunc(xh2, np.median(samplesh2[:,0]),np.median(samplesh2[:,1]))
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability_SFRMH2,
+                                      args=(sfr[ind_det], mass_H2[ind_det], sfr[ind_nondet], mass_H2[ind_nondet],
+                                            S_det, S_nondet))
+    sampler.run_mcmc(pos, 1000)
+    samples = sampler.chain[:, 200:, :].reshape((-1, ndim))
+    plot_corner_SFRMH2(samples) # plotting corner
+    # error shading for fit and best fit:
+    shading = shading_linear(sampler, samples, x_scale)
+    y_best = linfunc(x_scale, np.median(samples[:,0]),np.median(samples[:,1]))
 
     # plotting data and emcee fit results:
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
     fig, ax = plt.subplots(figsize=(8, 8))
-    ax.plot(xh2, ysch2, color='k', linewidth=1.5, label='Best fit (MCMC)', zorder=2)
-    ax.errorbar(sfr[indxcg_det], mass_H2[indxcg_det], yerr=error_H2[indxcg_det], xerr=sfr_err[indxcg_det],
+    ax.plot(x_scale, y_best, color='k', linewidth=1.5, label='Best fit (MCMC)', zorder=2)
+    ax.errorbar(sfr[ind_det], mass_H2[ind_det], yerr=error_H2[ind_det], xerr=sfr_err[ind_det],
                 fmt='o',
                 markersize=4, linewidth=0.5, mew=1, capsize=2,
                 capthick=0.5, mec='midnightblue', mfc="cornflowerblue", ecolor='midnightblue',
                 label="xCOLD GASS detections", zorder=3)
-    ax.errorbar(sfr[indxcg_nondet], mass_H2[indxcg_nondet], xerr=sfr_err[indxcg_nondet], fmt='v', markersize=4,
+    ax.errorbar(sfr[ind_nondet], mass_H2[ind_nondet], xerr=sfr_err[ind_nondet], fmt='v', markersize=5,
                 linewidth=0.5,
                 mew=1, capsize=2,
                 capthick=0.5, mec='midnightblue', mfc="cornflowerblue", ecolor='midnightblue',
                 label="xCOLD GASS non-detections", zorder=3)
-    ax.fill_between(xh2, shadingh2[0], shadingh2[1], facecolor='plum', zorder=1)
+    ax.fill_between(x_scale, shading[0], shading[1], facecolor='plum', zorder=1)
     leg = ax.legend(fancybox=True, prop={'size': 12})
     leg.get_frame().set_alpha(1.0)
     ax.set_xlabel("$\mathrm{log\, SFR\, [M_{\odot}\, yr^{-1}]}$", fontsize=16)
@@ -213,52 +208,57 @@ def sort_xGASS():
     # Loading xGASS data:
     xGASS = fits.open('xxGASS_MASTER_CO_170620_final.fits')
     xGASS = Table(xGASS[1].data).to_pandas()
-    sfr_HI = np.log10(xGASS['SFR_best'].values)
+    print(xGASS.columns)
+    sfr = np.log10(xGASS['SFR_best'].values)
     mass_HI = xGASS['lgMHI'].values
-    flag_HI = xGASS['HIsrc'].values
+    flag = xGASS['HIsrc'].values
     # Taking indices:
-    ind_xg = np.where((sfr_HI > -6) & (sfr_HI < 6) & (mass_HI > 4) & (mass_HI < 20))
-    indxg_det = np.where((sfr_HI > -6) & (sfr_HI < 6) & (mass_HI > 4) & (mass_HI < 20) & (flag_HI != 4))
-    indxg_nondet = np.where((sfr_HI > -6) & (sfr_HI < 6) & (mass_HI > 4) & (mass_HI < 20) & (flag_HI == 4))
+    #ind_det = np.where((sfr > -6) & (sfr < 6) & (mass_HI > 4) & (mass_HI < 20) & (flag != 4))
+    #ind_nondet = np.where((sfr > -6) & (sfr < 6) & (mass_HI > 4) & (mass_HI < 20) & (flag == 4))
+    ind_det = np.where((xGASS['SFR_best'] > -80) & (flag != 4))
+    ind_nondet = np.where((xGASS['SFR_best'] > -80) & (flag == 4))
     # Creating error arrays:
-    xerrxg1 = np.array(xGASS['SFRerr_best'].values / (xGASS['SFR_best'].values * np.log(10)))  # propagating error into log SFR
-    yerrxg1 = np.zeros(len(sfr_HI))
-    yerrxg1[indxg_det] = 0.2
-    yerrxg1[indxg_nondet] = 0.14  # non-detections errors
-    # building error matrix:
-    S_xg = S_error(xerrxg1[ind_xg], yerrxg1[ind_xg])
+    xerr = xGASS['SFRerr_best'].values / (xGASS['SFR_best'].values * np.log(10))  # propagating error into log SFR
+    yerr = np.zeros(len(xGASS))
+    yerr[ind_det] = 0.2
+    yerr[ind_nondet] = 0.14  # non-detections errors
+    # Building error matrices:
+    S_det = S_error(xerr[ind_det], yerr[ind_det])
+    S_nondet = S_error(xerr[ind_nondet], yerr[ind_nondet])
+
 
     # running emcee:
     ndim, nwalkers = 3, 100
     initial = np.array([0.7, 9.0, -1])
     pos = [initial + 1e-4 * np.random.randn(ndim) for i in range(nwalkers)]
-    samplerHI = emcee.EnsembleSampler(nwalkers, ndim, log_probability_SFRMHI,
-                                      args=(sfr_HI[ind_xg], mass_HI[ind_xg], S_xg, flag_HI[ind_xg]))
-    samplerHI.run_mcmc(pos, 1000)
-    samplesHI = samplerHI.chain[:, 200:, :].reshape((-1, ndim))
-    plot_corner_SFRMHI(samplesHI)  # plotting corner
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability_SFRMHI,
+                                      args=(sfr[ind_det], mass_HI[ind_det], sfr[ind_nondet], mass_HI[ind_nondet],
+                                            S_det, S_nondet))
+    sampler.run_mcmc(pos, 1000)
+    samples = sampler.chain[:, 200:, :].reshape((-1, ndim))
+    plot_corner_SFRMHI(samples)  # plotting corner
 
-    xHI = np.linspace(-3,2,100)
+    x_scale = np.linspace(-3,2,100)
 
-    yschI = linfunc(xHI, np.median(samplesHI[:, 0]), np.median(samplesHI[:, 1]))  # best fit from medians
-    shadinghI = shading_linear(samplerHI, samplesHI, xHI)  # shading error region on fit
+    y_best = linfunc(x_scale, np.median(samples[:, 0]), np.median(samples[:, 1]))  # best fit from medians
+    shading = shading_linear(sampler, samples, x_scale)  # shading error region on fit
 
     # plotting result:
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
     fig, ax = plt.subplots(figsize=(8, 8))
-    ax.plot(xHI, yschI, color='k', linewidth=1.5, label='Best fit (MCMC)', zorder=2)
-    ax.errorbar(sfr_HI[indxg_det], mass_HI[indxg_det], yerr=yerrxg1[indxg_det],
-                xerr=xerrxg1[indxg_det], fmt='o',
-                markersize=4, linewidth=0.7, mew=1, capsize=2,
+    ax.errorbar(sfr[ind_det], mass_HI[ind_det], yerr=yerr[ind_det],
+                xerr=xerr[ind_det], fmt='o',
+                markersize=4, linewidth=0.5, mew=1, capsize=2,
                 capthick=0.5, mec='midnightblue', mfc="cornflowerblue", ecolor='midnightblue',
-                label="xCOLD GASS detections", zorder=3)
-    ax.errorbar(sfr_HI[indxg_nondet], mass_HI[indxg_nondet], xerr=xerrxg1[indxg_nondet], fmt='v',
-                markersize=4, linewidth=0.7,
+                label="xGASS detections", zorder=3)
+    ax.errorbar(sfr[ind_nondet], mass_HI[ind_nondet], xerr=xerr[ind_nondet], fmt='v',
+                markersize=5, linewidth=0.5,
                 mew=1, capsize=2,
                 capthick=0.5, mec='midnightblue', mfc="cornflowerblue", ecolor='midnightblue',
-                label="xCOLD GASS non-detections", zorder=4)
-    ax.fill_between(xHI, shadinghI[0], shadinghI[1], facecolor='plum', zorder=1)
+                label="xGASS non-detections", zorder=3)
+    ax.plot(x_scale, y_best, color='k', linewidth=1.5, label='Best fit (MCMC)', zorder=2)
+    ax.fill_between(x_scale, shading[0], shading[1], facecolor='plum', zorder=1)
     leg = ax.legend(fancybox=True, prop={'size': 12})
     leg.get_frame().set_alpha(1.0)
     ax.set_xlabel("$\mathrm{log\, SFR\, [M_{\odot}\, yr^{-1}]}$", fontsize=16)
@@ -322,17 +322,13 @@ def plot_corner_MS(samples_input):
 def sort_GAMA_starforming():
     GAMA = pd.read_csv('GAMA_sample.dat', comment='#', header=None, sep=r"\s*", engine="python") # loading GAMA data
     GAMA.columns = ['ID', 'z', 'logM*', 'logM*err', 'logSFR', 'logSFRerr', 'ColorFlag'] # taking columns
-    GAMA = GAMA[np.isfinite(GAMA['logSFR'])]
-    GAMA = GAMA[np.isfinite(GAMA['logM*'])]
-    GAMA = GAMA[GAMA['logSFR'] > -7]
+    GAMA = GAMA[GAMA['logSFR'] > -7] # taking finite values
     GAMA = GAMA[GAMA['logM*'] > 7]
     GAMA = GAMA[GAMA['ColorFlag'] == 1] # selecting main sequence of star forming galaxies only
-    mass_sf = np.array(GAMA['logM*'])
-    mass_sferr = np.array(GAMA['logM*err'])
-    sfr_sf = np.array(GAMA['logSFR'])
-    sfr_sferr = np.array(GAMA['logSFRerr'])
+    mass_sf, mass_sferr, sfr_sf, sfr_sferr = GAMA['logM*'].values, GAMA['logM*err'].values,\
+                                             GAMA['logSFR'].values, GAMA['logSFRerr'].values
 
-    xMS = np.linspace(7, 12, 100)  # array of x values for main sequence fit
+    x_scale = np.linspace(7, 12, 100)  # array of x values for main sequence fit
 
     # creating bins along main sequence:
     bins = np.linspace(7.5, 11, 15)
@@ -352,8 +348,8 @@ def sort_GAMA_starforming():
     sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability_MS, args=(mass_sf, sfr_sf, mass_sferr, sfr_sferr))
     sampler.run_mcmc(pos, 1000)
     samples = sampler.chain[:, 200:, :].reshape((-1, ndim))
-    shade = shading_MS(sampler, samples, xMS) # creating shading on fit
-    y_new = func(xMS, np.median(samples[:, 0]), np.median(samples[:, 1]), np.median(samples[:, 2])) # best fit
+    shading = shading_MS(sampler, samples, x_scale) # creating shading on fit
+    y_best = func(x_scale, np.median(samples[:, 0]), np.median(samples[:, 1]), np.median(samples[:, 2])) # best fit
 
     plot_corner_MS(samples) # plotting corner
 
@@ -367,8 +363,8 @@ def sort_GAMA_starforming():
     ax.errorbar(m_bin, sfr_bin, yerr=err_bin, fmt="o", markersize=6, linewidth=1, mew=1.5, capsize=3,
                 capthick=1, mec='midnightblue', mfc="cornflowerblue", ecolor='midnightblue', label="GAMA binned",
                 zorder=4)
-    ax.plot(xMS, y_new, c="k", linewidth=1.5, label='Best fit (MCMC)', zorder=3)
-    ax.fill_between(xMS, shade[0], shade[1], facecolor='plum', zorder=2)
+    ax.plot(x_scale, y_best, c="k", linewidth=1.5, label='Best fit (MCMC)', zorder=3)
+    ax.fill_between(x_scale, shading[0], shading[1], facecolor='plum', zorder=2)
     leg = ax.legend(fancybox=True, prop={'size': 14})
     leg.get_frame().set_alpha(1.0)
     ax.set_ylabel("$\mathrm{log\, SFR\, [M_{\odot}\, yr^{-1}]}$", fontsize=16)
