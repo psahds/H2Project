@@ -143,9 +143,7 @@ def sort_xCOLDGASS():
     # loading data:
     xCOLDGASS = fits.open('xCOLDGASS_PubCat.fits')
     xCOLDGASS = Table(xCOLDGASS[1].data).to_pandas()
-    flag_CO = xCOLDGASS['FLAG_CO'].values
-    sfr = xCOLDGASS['LOGSFR_BEST'].values
-    sfr_err = xCOLDGASS['LOGSFR_ERR'].values
+    flag_CO, sfr, sfr_err = xCOLDGASS['FLAG_CO'].values, xCOLDGASS['LOGSFR_BEST'].values, xCOLDGASS['LOGSFR_ERR'].values
     # defining an array of MH2 for both detections and non detections:
     indUpperLimit = np.where(flag_CO == 2)  # indices for galaxies with upper limits
     indNoUpperLimit = np.where(flag_CO == 1)  # indices for galaxies with upper limits
@@ -208,13 +206,8 @@ def sort_xGASS():
     # Loading xGASS data:
     xGASS = fits.open('xxGASS_MASTER_CO_170620_final.fits')
     xGASS = Table(xGASS[1].data).to_pandas()
-    print(xGASS.columns)
-    sfr = np.log10(xGASS['SFR_best'].values)
-    mass_HI = xGASS['lgMHI'].values
-    flag = xGASS['HIsrc'].values
+    sfr, mass_HI, flag = np.log10(xGASS['SFR_best'].values), xGASS['lgMHI'].values, xGASS['HIsrc'].values
     # Taking indices:
-    #ind_det = np.where((sfr > -6) & (sfr < 6) & (mass_HI > 4) & (mass_HI < 20) & (flag != 4))
-    #ind_nondet = np.where((sfr > -6) & (sfr < 6) & (mass_HI > 4) & (mass_HI < 20) & (flag == 4))
     ind_det = np.where((xGASS['SFR_best'] > -80) & (flag != 4))
     ind_nondet = np.where((xGASS['SFR_best'] > -80) & (flag == 4))
     # Creating error arrays:
@@ -225,7 +218,6 @@ def sort_xGASS():
     # Building error matrices:
     S_det = S_error(xerr[ind_det], yerr[ind_det])
     S_nondet = S_error(xerr[ind_nondet], yerr[ind_nondet])
-
 
     # running emcee:
     ndim, nwalkers = 3, 100
