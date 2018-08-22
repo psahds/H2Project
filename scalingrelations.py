@@ -184,11 +184,11 @@ def sort_xCOLDGASS():
     ax.plot(x_scale, y_best, color='k', linewidth=1.5, label='Best fit (MCMC)', zorder=2)
     ax.errorbar(sfr[ind_det], mass_H2[ind_det], yerr=error_H2[ind_det], xerr=sfr_err[ind_det],
                 fmt='o',
-                markersize=4, linewidth=0.5, mew=1, capsize=2,
+                markersize=4, linewidth=0.4, mew=1, capsize=2,
                 capthick=0.5, mec='midnightblue', mfc="cornflowerblue", ecolor='midnightblue',
                 label="xCOLD GASS detections", zorder=3)
     ax.errorbar(sfr[ind_nondet], mass_H2[ind_nondet], xerr=sfr_err[ind_nondet], fmt='v', markersize=5,
-                linewidth=0.5,
+                linewidth=0.4,
                 mew=1, capsize=2,
                 capthick=0.5, mec='midnightblue', mfc="cornflowerblue", ecolor='midnightblue',
                 label="xCOLD GASS non-detections", zorder=3)
@@ -214,7 +214,7 @@ def sort_xGASS():
     xerr = xGASS['SFRerr_best'].values / (xGASS['SFR_best'].values * np.log(10))  # propagating error into log SFR
     yerr = np.zeros(len(xGASS))
     yerr[ind_det] = 0.2
-    yerr[ind_nondet] = 0.14  # non-detections errors
+    yerr[ind_nondet] = 0.09  # non-detections errors
     # Building error matrices:
     S_det = S_error(xerr[ind_det], yerr[ind_det])
     S_nondet = S_error(xerr[ind_nondet], yerr[ind_nondet])
@@ -230,7 +230,7 @@ def sort_xGASS():
     samples = sampler.chain[:, 200:, :].reshape((-1, ndim))
     plot_corner_SFRMHI(samples)  # plotting corner
 
-    x_scale = np.linspace(-3,2,100)
+    x_scale = np.linspace(-3.2,2,100)
 
     y_best = linfunc(x_scale, np.median(samples[:, 0]), np.median(samples[:, 1]))  # best fit from medians
     shading = shading_linear(sampler, samples, x_scale)  # shading error region on fit
@@ -241,11 +241,11 @@ def sort_xGASS():
     fig, ax = plt.subplots(figsize=(8, 8))
     ax.errorbar(sfr[ind_det], mass_HI[ind_det], yerr=yerr[ind_det],
                 xerr=xerr[ind_det], fmt='o',
-                markersize=4, linewidth=0.5, mew=1, capsize=2,
+                markersize=4, linewidth=0.4, mew=1, capsize=2,
                 capthick=0.5, mec='midnightblue', mfc="cornflowerblue", ecolor='midnightblue',
                 label="xGASS detections", zorder=3)
     ax.errorbar(sfr[ind_nondet], mass_HI[ind_nondet], xerr=xerr[ind_nondet], fmt='v',
-                markersize=5, linewidth=0.5,
+                markersize=5, linewidth=0.4,
                 mew=1, capsize=2,
                 capthick=0.5, mec='midnightblue', mfc="cornflowerblue", ecolor='midnightblue',
                 label="xGASS non-detections", zorder=3)
@@ -255,7 +255,7 @@ def sort_xGASS():
     leg.get_frame().set_alpha(1.0)
     ax.set_xlabel("$\mathrm{log\, SFR\, [M_{\odot}\, yr^{-1}]}$", fontsize=16)
     ax.set_ylabel("$\mathrm{log\, M_{HI}\, [M_\odot]}$", fontsize=16)
-    ax.set_xlim([-3, 2])
+    ax.set_xlim([-3.2, 1.7])
     ax.set_ylim([7, 11])
     plt.savefig('sfrHI.pdf', format='pdf', dpi=300, transparent=False)
 
