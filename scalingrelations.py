@@ -8,6 +8,8 @@ from scipy import special
 import pandas as pd
 from astropy.io import fits
 from astropy.table import Table
+import atpy
+
 
 # FUNCTIONS ############################################################################################################
 
@@ -26,7 +28,7 @@ def log_prior_SFRMH2(theta):
     return -np.inf
 
 
-def log_probability_SFRMH2(theta, x, y, x2, y2, S, S2):
+def log_probability_SFRMH2(theta, x, y, x2, y2, S, S2, w, w2):
     m, const, lnf = theta
     v = np.array([-m, 1.0])
     # calculating sigma squared for detections:
@@ -38,7 +40,7 @@ def log_probability_SFRMH2(theta, x, y, x2, y2, S, S2):
     # calculating model for non-detections:
     model = (m * x2) + const
     # calculating likelihood for all detections:
-    ll1 = -0.5 * np.sum(deltaN ** 2 / sigma2 + np.log(sigma2))
+    ll1 = -0.5 * np.sum(deltaN ** 2 / sigma2 + np.log(sigma2) + np.log(1/(w*w)))
     # considering non-detections:
     I = np.zeros(len(x2))
     for i in range(0,len(x2)):
@@ -50,7 +52,7 @@ def log_probability_SFRMH2(theta, x, y, x2, y2, S, S2):
         # note2: the error function is used to integrate the Gaussian function within our limits, this significantly
             # reduces the time it takes to compute all the integrals for all the upper limits
     # calculating likelihood for all non-detections:
-    ll2 = np.sum(I)
+    ll2 = np.sum(I + np.log(w2))
     return ll1 + ll2 + log_prior_SFRMH2(theta) # combining detection & non detection results
 
 
@@ -73,7 +75,7 @@ def log_prior_SFRMHI(theta):
     return -np.inf
 
 
-def log_probability_SFRMHI(theta, x, y, x2, y2, S, S2):
+def log_probability_SFRMHI(theta, x, y, x2, y2, S, S2, w, w2):
     m, const, lnf = theta
     v = np.array([-m, 1.0])
     # calculating sigma squared for detections:
@@ -83,7 +85,7 @@ def log_probability_SFRMHI(theta, x, y, x2, y2, S, S2):
     deltaN = y - (m * x) - const # for detections
     model = (m * x2) + const # for non-detections
     # calculating likelihood for all detections:
-    ll1 = -0.5 * np.sum(deltaN ** 2 / sigma2 + np.log(sigma2))
+    ll1 = -0.5 * np.sum(deltaN ** 2 / sigma2 + np.log(sigma2) + np.log(1/(w*w)))
     I = np.zeros(len(x2))
     # considering non-detections:
     for i in range(0,len(x2)):
@@ -91,7 +93,7 @@ def log_probability_SFRMHI(theta, x, y, x2, y2, S, S2):
         I[i] = np.log(((2 * np.pi) ** 0.5) *
                       0.5 * (special.erf((y2[i]-model[i]) / ((2 ** 0.5) * sigma[i])) + 1))
     # calculating likelihood for all non-detections:
-    ll2 = np.sum(I)
+    ll2 = np.sum(I + np.log(w2))
     return ll1 + ll2 + log_prior_SFRMHI(theta) # combining detection & non detection results
 
 
@@ -141,9 +143,10 @@ def shading_linear(sampler_input, samples_input, x_input):
 # Sorting xCOLD GASS data:
 def sort_xCOLDGASS():
     # loading data:
-    xCOLDGASS = fits.open('xCOLDGASS_PubCat.fits')
+    xCOLDGASS = fits.open('Survey_Data/xCOLDGASS_PubCat.fits') # obtained from http://www.star.ucl.ac.uk/xCOLDGASS
     xCOLDGASS = Table(xCOLDGASS[1].data).to_pandas()
     flag_CO, sfr, sfr_err = xCOLDGASS['FLAG_CO'].values, xCOLDGASS['LOGSFR_BEST'].values, xCOLDGASS['LOGSFR_ERR'].values
+    weights = xCOLDGASS['WEIGHT'].values
     # defining an array of MH2 for both detections and non detections:
     indUpperLimit = np.where(flag_CO == 2)  # indices for galaxies with upper limits
     indNoUpperLimit = np.where(flag_CO == 1)  # indices for galaxies with upper limits
@@ -169,7 +172,7 @@ def sort_xCOLDGASS():
     pos = [initial + 1e-4*np.random.randn(ndim) for i in range(nwalkers)]
     sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability_SFRMH2,
                                       args=(sfr[ind_det], mass_H2[ind_det], sfr[ind_nondet], mass_H2[ind_nondet],
-                                            S_det, S_nondet))
+                                            S_det, S_nondet, weights[ind_det], weights[ind_nondet]))
     sampler.run_mcmc(pos, 1000)
     samples = sampler.chain[:, 200:, :].reshape((-1, ndim))
     plot_corner_SFRMH2(samples) # plotting corner
@@ -204,9 +207,10 @@ def sort_xCOLDGASS():
 
 def sort_xGASS():
     # Loading xGASS data:
-    xGASS = fits.open('xxGASS_MASTER_CO_170620_final.fits')
+    xGASS = fits.open('Survey_Data/xGASS_representative_sample.fits') # obtained from http://xgass.icrar.org/data.html
     xGASS = Table(xGASS[1].data).to_pandas()
     sfr, mass_HI, flag = np.log10(xGASS['SFR_best'].values), xGASS['lgMHI'].values, xGASS['HIsrc'].values
+    weights = xGASS['weight'].values
     # Taking indices:
     ind_det = np.where((xGASS['SFR_best'] > -80) & (flag != 4))
     ind_nondet = np.where((xGASS['SFR_best'] > -80) & (flag == 4))
@@ -225,7 +229,7 @@ def sort_xGASS():
     pos = [initial + 1e-4 * np.random.randn(ndim) for i in range(nwalkers)]
     sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability_SFRMHI,
                                       args=(sfr[ind_det], mass_HI[ind_det], sfr[ind_nondet], mass_HI[ind_nondet],
-                                            S_det, S_nondet))
+                                            S_det, S_nondet, weights[ind_det], weights[ind_nondet]))
     sampler.run_mcmc(pos, 1000)
     samples = sampler.chain[:, 200:, :].reshape((-1, ndim))
     plot_corner_SFRMHI(samples)  # plotting corner
@@ -312,7 +316,7 @@ def plot_corner_MS(samples_input):
 
 
 def sort_GAMA_starforming():
-    GAMA = pd.read_csv('GAMA_sample.dat', comment='#', header=None, sep=r"\s*", engine="python") # loading GAMA data
+    GAMA = pd.read_csv('Survey_Data/GAMA_sample.dat', comment='#', header=None, sep=r"\s*", engine="python") # loading GAMA data
     GAMA.columns = ['ID', 'z', 'logM*', 'logM*err', 'logSFR', 'logSFRerr', 'ColorFlag'] # taking columns
     GAMA = GAMA[GAMA['logSFR'] > -7] # taking finite values
     GAMA = GAMA[GAMA['logM*'] > 7]
