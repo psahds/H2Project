@@ -212,7 +212,6 @@ def sort_xGASS():
     xGASS_errors = fits.open('Survey_Data/xGASS_RS_final_Serr_180903.fits') # obtained through private communication
     xGASS_errors = Table(xGASS_errors[1].data).to_pandas()
     print(xGASS_errors.columns)
-    #xGASS = pd.merge(xGASS_representative, xGASS_errors, how='right', on=['AGCnr'])
 
     xGASS = pd.merge(xGASS_representative, xGASS_errors, left_index = True, right_index = True, how = 'outer')
 
@@ -227,8 +226,8 @@ def sort_xGASS():
     yerr = np.zeros(len(xGASS))
     print(len(ind_det[0])+len(ind_nondet[0]))
     errMHI[ind_det] = ((2.356 * 10E5) / (1 + xGASS['zHI_x'].values[ind_det])) * ((xGASS['Dlum'].values[ind_det]) ** 2) \
-                      * (xGASS['Serr'].values[ind_det])
-    yerr[ind_det] = errMHI[ind_det] / ((10 ** mass_HI[ind_det]) * np.log(10))
+                      * (xGASS['Serr'].values[ind_det]) # calculating MHI error from HI flux error
+    yerr[ind_det] = errMHI[ind_det] / ((10 ** mass_HI[ind_det]) * np.log(10)) # propagating MHI error to log
     yerr[ind_nondet] = 0.09  # non-detections errors
     # Building error matrices:
     S_det = S_error(xerr[ind_det], yerr[ind_det])
@@ -383,6 +382,6 @@ def sort_GAMA_starforming():
 
 
 
-#sort_xCOLDGASS()
+sort_xCOLDGASS()
 sort_xGASS()
-#sort_GAMA_starforming()
+sort_GAMA_starforming()
