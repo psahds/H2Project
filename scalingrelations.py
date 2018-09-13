@@ -207,17 +207,28 @@ def sort_xCOLDGASS():
 
 def sort_xGASS():
     # Loading xGASS data:
-    xGASS = fits.open('Survey_Data/xGASS_representative_sample.fits') # obtained from http://xgass.icrar.org/data.html
-    xGASS = Table(xGASS[1].data).to_pandas()
-    sfr, mass_HI, flag = np.log10(xGASS['SFR_best'].values), xGASS['lgMHI'].values, xGASS['HIsrc'].values
+    xGASS_representative = fits.open('Survey_Data/xGASS_representative_sample.fits') # obtained from http://xgass.icrar.org/data.html
+    xGASS_representative = Table(xGASS_representative[1].data).to_pandas()
+    xGASS_errors = fits.open('Survey_Data/xGASS_RS_final_Serr_180903.fits') # obtained through private communication
+    xGASS_errors = Table(xGASS_errors[1].data).to_pandas()
+    print(xGASS_errors.columns)
+    #xGASS = pd.merge(xGASS_representative, xGASS_errors, how='right', on=['AGCnr'])
+
+    xGASS = pd.merge(xGASS_representative, xGASS_errors, left_index = True, right_index = True, how = 'outer')
+
+    sfr, mass_HI, flag = np.log10(xGASS['SFR_best'].values), xGASS['lgMHI_x'].values, xGASS['HIsrc_x'].values
     weights = xGASS['weight'].values
     # Taking indices:
     ind_det = np.where((xGASS['SFR_best'] > -80) & (flag != 4))
     ind_nondet = np.where((xGASS['SFR_best'] > -80) & (flag == 4))
     # Creating error arrays:
     xerr = xGASS['SFRerr_best'].values / (xGASS['SFR_best'].values * np.log(10))  # propagating error into log SFR
+    errMHI = np.zeros(len(xGASS))
     yerr = np.zeros(len(xGASS))
-    yerr[ind_det] = 0.2
+    print(len(ind_det[0])+len(ind_nondet[0]))
+    errMHI[ind_det] = ((2.356 * 10E5) / (1 + xGASS['zHI_x'].values[ind_det])) * ((xGASS['Dlum'].values[ind_det]) ** 2) \
+                      * (xGASS['Serr'].values[ind_det])
+    yerr[ind_det] = errMHI[ind_det] / ((10 ** mass_HI[ind_det]) * np.log(10))
     yerr[ind_nondet] = 0.09  # non-detections errors
     # Building error matrices:
     S_det = S_error(xerr[ind_det], yerr[ind_det])
@@ -370,6 +381,8 @@ def sort_GAMA_starforming():
 
 # MAIN PROGRAM #########################################################################################################
 
-sort_xCOLDGASS()
+
+
+#sort_xCOLDGASS()
 sort_xGASS()
-sort_GAMA_starforming()
+#sort_GAMA_starforming()
