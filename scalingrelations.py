@@ -192,20 +192,20 @@ def sort_xCOLDGASS():
     ax.errorbar(sfr[ind_det], mass_H2[ind_det], yerr=error_H2[ind_det], xerr=sfr_err[ind_det],
                 fmt='o',
                 markersize=4, linewidth=0.4, mew=1, capsize=2,
-                capthick=0.5, mec='midnightblue', mfc="cornflowerblue", ecolor='midnightblue',
+                capthick=0.5, mec='midnightblue', mfc="cornflowerblue", ecolor='cornflowerblue',
                 label="xCOLD GASS detections", zorder=3)
     ax.errorbar(sfr[ind_nondet], mass_H2[ind_nondet], xerr=sfr_err[ind_nondet], fmt='v', markersize=5,
                 linewidth=0.4,
                 mew=1, capsize=2,
-                capthick=0.5, mec='midnightblue', mfc="cornflowerblue", ecolor='midnightblue',
+                capthick=0.5, mec='darkred', mfc="salmon", ecolor='salmon',
                 label="xCOLD GASS non-detections", zorder=3)
-    ax.fill_between(x_scale, shading[0], shading[1], facecolor='plum', zorder=1)
+    ax.fill_between(x_scale, shading[0], shading[1], facecolor='darkgray', zorder=1)
     leg = ax.legend(fancybox=True, prop={'size': 12})
     leg.get_frame().set_alpha(1.0)
     ax.set_xlabel("$\mathrm{log\, SFR\, [M_{\odot}\, yr^{-1}]}$", fontsize=16)
     ax.set_ylabel("$\mathrm{log\, M_{H_{2}}\, [M_\odot]}$", fontsize=16)
     ax.set_xlim([-3, 2])
-    ax.set_ylim([7, 10.5])
+    ax.set_ylim([7, 11])
     plt.savefig('sfrH2.pdf', format='pdf', dpi=300, transparent=False)
 
 
@@ -260,20 +260,20 @@ def sort_xGASS():
     ax.errorbar(sfr[ind_det], mass_HI[ind_det], yerr=yerr[ind_det],
                 xerr=xerr[ind_det], fmt='o',
                 markersize=4, linewidth=0.4, mew=1, capsize=2,
-                capthick=0.5, mec='midnightblue', mfc="cornflowerblue", ecolor='midnightblue',
+                capthick=0.5, mec='midnightblue', mfc="cornflowerblue", ecolor='cornflowerblue',
                 label="xGASS detections", zorder=3)
     ax.errorbar(sfr[ind_nondet], mass_HI[ind_nondet], xerr=xerr[ind_nondet], fmt='v',
                 markersize=5, linewidth=0.4,
                 mew=1, capsize=2,
-                capthick=0.5, mec='midnightblue', mfc="cornflowerblue", ecolor='midnightblue',
+                capthick=0.5, mec='darkred', mfc="salmon", ecolor='salmon',
                 label="xGASS non-detections", zorder=3)
     ax.plot(x_scale, y_best, color='k', linewidth=1.5, label='Best fit (MCMC)', zorder=2)
-    ax.fill_between(x_scale, shading[0], shading[1], facecolor='plum', zorder=1)
+    ax.fill_between(x_scale, shading[0], shading[1], facecolor='darkgray', zorder=1)
     leg = ax.legend(fancybox=True, prop={'size': 12})
     leg.get_frame().set_alpha(1.0)
     ax.set_xlabel("$\mathrm{log\, SFR\, [M_{\odot}\, yr^{-1}]}$", fontsize=16)
     ax.set_ylabel("$\mathrm{log\, M_{HI}\, [M_\odot]}$", fontsize=16)
-    ax.set_xlim([-3.2, 1.7])
+    ax.set_xlim([-3, 2])
     ax.set_ylim([7, 11])
     plt.savefig('sfrHI.pdf', format='pdf', dpi=300, transparent=False)
 
