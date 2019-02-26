@@ -12,4 +12,4 @@ This study makes use of the xCOLD GASS survey (http://www.star.ucl.ac.uk/xCOLDGA
 
 This code makes use of the Python packages emcee (http://dfm.io/emcee/current/#) and corner (https://corner.readthedocs.io/en/latest/index.html).
 
-The functions and main program can all be found in \texttt{scalingrelations.py}, output figures can be found in repository as yielded from code, in .pdf format.
+The functions and main program can all be found in scalingrelations.py, output figures can be found in repository as yielded from code, in .pdf format.
