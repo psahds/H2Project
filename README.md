@@ -11,3 +11,5 @@ This is part of a larger study that attempts to determine the cosmic abundance o
 This study makes use of the xCOLD GASS survey (http://www.star.ucl.ac.uk/xCOLDGASS), the xGASS survey (http://xgass.icrar.org/data.html) and the GAMA survey (http://www.gama-survey.org/). The data from this surveys that was used in this study can be found online at  given links, and is also in the Survey_Data folder.
 
 This code makes use of the Python packages emcee (http://dfm.io/emcee/current/#) and corner (https://corner.readthedocs.io/en/latest/index.html).
+
+The functions and main program can all be found in $\texttt{scalingrelations.py}$, output figures can be found in repository as yielded from code, in .pdf format.
