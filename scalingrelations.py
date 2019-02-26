@@ -18,25 +18,29 @@ import atpy
 # FUNCTIONS ############################################################################################################
 
 
-# Linear function y = mx + b for fitting SFr vs. MH2 and SFR vs. MHI planes:
+# Linear function y = mx + b for fitting Star Formation Rate (SFR) vs. MH2 and SFR vs. MHI planes:
 def linfunc(xdata, m, c):
     y = m*xdata + c
     return y
 
 
-# Functions for SFR vs. MH2 linear scaling relation:
+########## Functions for SFR vs. MH2 linear scaling relation:
+
+# Prior (uniform, uninformative):
 def log_prior_SFRMH2(theta):
     m, const, lnf = theta
     if 0 < m < 1 and 8 < const < 10 and -5 < lnf < 5:
         return 0.0
     return -np.inf
 
-
+# Posterior probability:
 def log_probability_SFRMH2(theta, x, y, x2, y2, S, S2, w, w2):
     m, const, lnf = theta
     v = np.array([-m, 1.0])
     # calculating sigma squared for detections:
-    sigma2 = np.dot(np.dot(S, v), v) + np.exp(2 * lnf)
+    sigma2 = np.dot(np.dot(S, v), v) + np.exp(2 * lnf) 
+    #note: sigma calculation is: [sigma^ 2 = slope times xerr^2 + yerr^2 + scatter(f)^2]
+    #note2: this comes [sigma^2 = (measurement error)^2 + (instrinsic scatter)^2]
     # calculating sigma for non-detections:
     sigma = (np.dot(np.dot(S2, v), v) + np.exp(2 * lnf))**0.5
     # calculating difference between value (y) and model for detections:
@@ -57,9 +61,9 @@ def log_probability_SFRMH2(theta, x, y, x2, y2, S, S2, w, w2):
             # reduces the time it takes to compute all the integrals for all the upper limits
     # calculating likelihood for all non-detections:
     ll2 = np.sum(I + np.log(w2))
-    return ll1 + ll2 + log_prior_SFRMH2(theta) # combining detection & non detection results
+    return ll1 + ll2 + log_prior_SFRMH2(theta) # calculating posterior, product of detection & non detection likelihoods and prior
 
-
+# Plotting corner:
 def plot_corner_SFRMH2(samples_input):
     samples_input[:, 2] = np.exp(samples_input[:, 2]) # taking exponent of ln(scatter) to get scatter
     plt.rc('text', usetex=True)
@@ -71,14 +75,16 @@ def plot_corner_SFRMH2(samples_input):
     plt.savefig('sfrH2corner.pdf', format='pdf', dpi=300, transparent=False)
 
 
-# Prior and probability functions for SFR vs. MHI linear scaling relation:
+########## Functions for SFR vs. MHI linear scaling relation:
+
+# Prior (uniform, uninformative):
 def log_prior_SFRMHI(theta):
     m, const, lnf = theta
     if 0 < m < 10 and 6 < const < 12 and -5 < lnf < 5:
         return 0.0
     return -np.inf
 
-
+# Posterior probability:
 def log_probability_SFRMHI(theta, x, y, x2, y2, S, S2, w, w2):
     m, const, lnf = theta
     v = np.array([-m, 1.0])
@@ -98,9 +104,9 @@ def log_probability_SFRMHI(theta, x, y, x2, y2, S, S2, w, w2):
                       0.5 * (special.erf((y2[i]-model[i]) / ((2 ** 0.5) * sigma[i])) + 1))
     # calculating likelihood for all non-detections:
     ll2 = np.sum(I + np.log(w2))
-    return ll1 + ll2 + log_prior_SFRMHI(theta) # combining detection & non detection results
+    return ll1 + ll2 + log_prior_SFRMHI(theta) # calculating posterior, product of detection & non detection likelihoods and prior
 
-
+# Plotting corner:
 def plot_corner_SFRMHI(samples_input):
     samples_input[:, 2] = np.exp(samples_input[:, 2])
     plt.rc('text', usetex=True)
@@ -111,6 +117,8 @@ def plot_corner_SFRMHI(samples_input):
                   quantiles=[0.16, 0.84], show_titles=True, title_kwargs={"fontsize": 12})
     plt.savefig('sfrHIcorner.pdf', format='pdf', dpi=300, transparent=False)
 
+
+########## Functions for both SFR vs. MH2 and SFR vs. MHI relations:
 
 # Building x- and y-error matrix (in our case it is diagonal since errors aren't correlated)
 def S_error(x_err,y_err):
@@ -144,7 +152,7 @@ def shading_linear(sampler_input, samples_input, x_input):
     return y_max, y_min
 
 
-# Sorting xCOLD GASS data:
+# Sorting xCOLD GASS data (SFR vs. MH2):
 def sort_xCOLDGASS():
     # loading data:
     xCOLDGASS = fits.open('Survey_Data/xCOLDGASS_PubCat.fits') # obtained from http://www.star.ucl.ac.uk/xCOLDGASS
@@ -153,7 +161,7 @@ def sort_xCOLDGASS():
     weights = xCOLDGASS['WEIGHT'].values
     # defining an array of MH2 for both detections and non detections:
     indUpperLimit = np.where(flag_CO == 2)  # indices for galaxies with upper limits
-    indNoUpperLimit = np.where(flag_CO == 1)  # indices for galaxies with upper limits
+    indNoUpperLimit = np.where(flag_CO == 1)  # indices for galaxies without upper limits
     mass_H2 = np.zeros(len(xCOLDGASS), dtype=float)
     mass_H2[indNoUpperLimit] = xCOLDGASS['LOGMH2'].values[indNoUpperLimit]
     mass_H2[indUpperLimit] = xCOLDGASS['LIM_LOGMH2'].values[indUpperLimit]
@@ -208,7 +216,7 @@ def sort_xCOLDGASS():
     ax.set_ylim([7, 11])
     plt.savefig('sfrH2.pdf', format='pdf', dpi=300, transparent=False)
 
-
+# Sorting xGASS data (SFR vs. MHI):
 def sort_xGASS():
     # Loading xGASS data:
     xGASS_representative = fits.open('Survey_Data/xGASS_representative_sample.fits') # obtained from http://xgass.icrar.org/data.html
@@ -278,41 +286,29 @@ def sort_xGASS():
     plt.savefig('sfrHI.pdf', format='pdf', dpi=300, transparent=False)
 
 
-# For main sequence of star forming galaxies:
+########## Functions for main sequence of star forming galaxies (Stellar mass vs. SFR):
+
+# Second order polynomial fitting:
 def func(x,a,b,c):
     return (a * (x**2)) + (b * x) + c
 
-
+# Prior (uniform, uninformative):
 def log_prior_MS(theta):
     a, b, c, lnf = theta
     if -1.5 < a < 1.5 and 0 < b < 4 and -20 < c < -1 and -5 < lnf < 10:
         return 0.0
     return -np.inf
 
-
-def log_prior_RC(theta):
-    a, b, lnf = theta
-    if -1.5 < a < 2.5 and -20 < b < -4 and -5 < lnf < 10:
-        return 0.0
-    return -np.inf
-
-def log_probability_RC(theta, x, y, xerr, yerr):
-    a, b, lnf = theta
-    # calulating sigma squared using propagation of uncertainties:
-    sigma2 = np.square(xerr)*np.square(a) + np.square(yerr) + np.exp(2 * lnf)
-    deltaN = y - (a * x) - b
-    ll = -0.5 * np.sum(deltaN ** 2 / sigma2 + np.log(sigma2)) # calculating likelihood
-    return ll + log_prior_RC(theta)
-
-
+# Posterior probability:
 def log_probability_MS(theta, x, y, xerr, yerr):
     a, b, c, lnf = theta
     # calulating sigma squared using propagation of uncertainties:
     sigma2 = np.square(xerr)*np.square(2*a*x + b) + np.square(yerr) + np.exp(2 * lnf)
+    # calculating difference between data and model:
     deltaN = y - (a * (x**2)) - (b * x) - c
-    ll = -0.5 * np.sum(deltaN ** 2 / sigma2 + np.log(sigma2)) # calculating likelihood
-    return ll + log_prior_MS(theta)
-
+    # calculating log likelihood function:
+    ll = -0.5 * np.sum(deltaN ** 2 / sigma2 + np.log(sigma2))
+    return ll + log_prior_MS(theta) # returns posterior (prior times likelihood)
 
 # Defining error shading for fit on scaling relation plot:
 def shading_MS(sampler_input, samples_input, x_input):
@@ -332,7 +328,7 @@ def shading_MS(sampler_input, samples_input, x_input):
     y_min = np.array(y_min)
     return y_max, y_min
 
-
+# Plotting corner:
 def plot_corner_MS(samples_input):
     samples_input[:, 3] = np.exp(samples_input[:, 3])
     plt.rc('text', usetex=True)
@@ -343,15 +339,7 @@ def plot_corner_MS(samples_input):
                   truth_color="k", quantiles=[0.16, 0.84], show_titles=True, title_kwargs={"fontsize": 12})
     plt.savefig('MScorner.pdf', format='pdf', dpi=300, transparent=False)
 
-def plot_corner_RC(samples_input):
-    samples_input[:, 2] = np.exp(samples_input[:, 2])
-    plt.rc('text', usetex=True)
-    plt.rc('font', family='serif')
-    corner.corner(samples_input, labels=["a", "b", "f"],
-                  truths=(np.median(samples_input[:, 0]), np.median(samples_input[:, 1]), np.median(samples_input[:, 2])),
-                  truth_color="k", quantiles=[0.16, 0.84], show_titles=True, title_kwargs={"fontsize": 12})
-    plt.savefig('RCcorner.pdf', format='pdf', dpi=300, transparent=False)
-
+# Sorting GAMA data (Main Sequence of star forming galaxies):
 def sort_GAMA_starforming():
     GAMA = pd.read_csv('Survey_Data/GAMA_sample.dat', comment='#', header=None, sep=r"\s*", engine="python") # loading GAMA data
     GAMA.columns = ['ID', 'z', 'logM*', 'logM*err', 'logSFR', 'logSFRerr', 'ColorFlag'] # taking columns
@@ -405,260 +393,8 @@ def sort_GAMA_starforming():
     ax.set_xlim([7, 12])
     plt.savefig('MS.pdf', format='pdf', dpi=300, transparent=False)
 
-def gauss(x,mu,sigma,A):
-    return A*np.exp(-(x-mu)**2/2/sigma**2)
-
-def bimodal(x,mu1,sigma1,A1,mu2,sigma2,A2):
-    return gauss(x,mu1,sigma1,A1)+gauss(x,mu2,sigma2,A2)
-
-def sort_GAMA2():
-    GAMA = pd.read_csv('Survey_Data/GAMA_sample.dat', comment='#', header=None, sep=r"\s*", engine="python") # loading GAMA data
-    GAMA.columns = ['ID', 'z', 'logM*', 'logM*err', 'logSFR', 'logSFRerr', 'ColorFlag'] # taking columns
-    GAMA = GAMA[GAMA['logSFR'] > -7] # taking finite values
-    GAMA = GAMA[GAMA['logM*'] > 7]
-
-    x_scale = np.linspace(7, 12, 100)  # array of x values for main sequence fit
-
-    # creating bins along main sequence:
-    bins = np.linspace(8, 11.2, 20)
-    m_bin, sfr_bin, err_bin = [], [], []
-    sfr_hist = [[]]
-    sfr_hist2 = []
-
-    for i in range(1, len(bins)):
-        # print (bins)
-
-        sfr_hist2_i = []
-
-        inbin = GAMA[(GAMA['logM*'] >= bins[i - 1]) & (GAMA['logM*'] < bins[i])]
-
-        sfr_hist.append(inbin['logSFR'])
-
-        sfr_hist2_i.append(np.histogram(inbin['logSFR'], bins=50, range=[-4,1]))
-        sfr_hist2_i = np.array(sfr_hist2_i[0])
-
-        sfr_hist2.append(sfr_hist2_i)
-
-        m_bin.append((bins[i] + bins[i - 1]) / 2)
-        sfr_bin.append(np.median(inbin['logSFR']))
-        err_bin.append(np.std(inbin['logSFR']))
-
-    sfr_histmin = np.zeros(19)
-
-    for i in range(0, 19):
-
-        y_i = sfr_hist2[i][0]
-        x_i = sfr_hist2[i][1]
-
-        x_i = (x_i[1:] + x_i[:-1]) / 2
-
-        if i < 13:
-
-            expect_gaus = (-0.5, .2, 70)
-            params2, cov2 = curve_fit(gauss, x_i, y_i, expect_gaus)
-
-            sfr_histmin[i] = params2[0] - 3*params2[1]
-
-        else:
-
-            expect_gaus = (-2.2, .2, 30, 0, .2, 80)
-            params2, cov2 = curve_fit(bimodal, x_i, y_i, expect_gaus)
-
-            gaus2 = bimodal(x_i, *params2)
-
-            trunc1 = gaus2[22:37]
-            trunc2 = x_i[22:37]
-
-            sfr_histmin[i] = trunc2[trunc1.argmin()]
-
-    m_MS = []
-    sfr_MS = []
-
-    for i in range(1,len(bins)):
-        sfr_MS_i = []
-        m_MS_i = []
-
-        inbin = GAMA[(GAMA['logM*'] >= bins[i - 1]) & (GAMA['logM*'] < bins[i])]
-
-        insfr_MS = inbin[inbin['logSFR'] >= sfr_histmin[i-1]]
-        sfr_MS_i.append(insfr_MS['logSFR'].values)
-        m_MS_i.append(insfr_MS['logM*'].values)
-
-
-        insfr_RC = inbin[inbin['logSFR'] <= sfr_histmin[i-1]]
-
-        for obj in m_MS_i:
-            m_MS.append(obj)
-        for obj in sfr_MS_i:
-            sfr_MS.append(obj)
-
-    sfr_MS = list(itertools.chain.from_iterable(sfr_MS))
-    m_MS = list(itertools.chain.from_iterable(m_MS))
-
-    y= sfr_hist2[2][0]
-    x= sfr_hist2[2][1]
-
-    x = (x[1:] + x[:-1]) / 2
-
-    expected = (-0.5, .2, 25)
-    params, cov = curve_fit(gauss, x, y, expected)
-    print(params)
-
-    guess = (0, 2, -11)
-    params_ = curve_fit(func, m_bin, sfr_histmin, guess)[0]
-    print(params_)
-
-    m_bin, sfr_bin, err_bin = np.array(m_bin), np.array(sfr_bin), np.array(err_bin)
-
-    y_best2 = func(x_scale, -0.07, 1.92, -12.45) # best fit
-    y_div = func(x_scale, params_[0], params_[1], params_[2])
-
-
-
-    MainSequence = GAMA[GAMA['logSFR'] >= func(GAMA['logM*'], params_[0], params_[1], params_[2])]
-    RedCloud = GAMA[GAMA['logSFR'] <= func(GAMA['logM*'], params_[0], params_[1], params_[2])]
-
-    mass_sf, mass_sferr, sfr_sf, sfr_sferr = MainSequence['logM*'].values, MainSequence['logM*err'].values, \
-                                             MainSequence['logSFR'].values, MainSequence['logSFRerr'].values
-    mass_rc, mass_rcerr, sfr_rc, sfr_rcerr = RedCloud['logM*'].values, RedCloud['logM*err'].values, \
-                                             RedCloud['logSFR'].values, RedCloud['logSFRerr'].values
-
-
-    guess_rc = (0, -16)
-    rc_fit = curve_fit(linfunc, mass_rc, sfr_rc, guess_rc)[0]
-    print(rc_fit)
-
-    rcfit = linfunc(x_scale, rc_fit[0], rc_fit[1])
-
-    # running emcee:
-    ndim, nwalkers = 4, 100
-    initial = np.array([-0.024, 1.3, -12.75, -1])
-    pos = [initial + 1e-4 * np.random.randn(ndim) for i in range(nwalkers)]
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability_MS, args=(mass_sf, sfr_sf, mass_sferr, sfr_sferr))
-    sampler.run_mcmc(pos, 1000)
-    samples = sampler.chain[:, 200:, :].reshape((-1, ndim))
-    shading1 = shading_MS(sampler, samples, x_scale)  # creating shading on fit
-    y_best = func(x_scale, np.median(samples[:, 0]), np.median(samples[:, 1]), np.median(samples[:, 2]))  # best fit
-
-    plot_corner_MS(samples)  # plotting corner
-
-    # running emcee:
-    ndim, nwalkers = 3, 100
-    initial = np.array([0.5, -8, -1])
-    pos = [initial + 1e-4 * np.random.randn(ndim) for i in range(nwalkers)]
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability_RC, args=(mass_rc, sfr_rc, mass_rcerr, sfr_rcerr))
-    sampler.run_mcmc(pos, 1000)
-    samples = sampler.chain[:, 200:, :].reshape((-1, ndim))
-    shading2 = shading_linear(sampler, samples, x_scale)  # creating shading on fit
-    y_bestRC = linfunc(x_scale, np.median(samples[:, 0]), np.median(samples[:, 1]))  # best fit
-
-    plot_corner_RC(samples)  # plotting corner
-
-    plt.rc('text', usetex=True)
-    plt.rc('font', family='serif')
-    fig, ax = plt.subplots(figsize=(8, 8))
-    ax.hist(sfr_hist[2], bins=50, range=[-4,1])
-    ax.plot(x, gauss(x, *params), color='red', lw=3, label='model')
-    plt.savefig('MS2_hist.pdf', format='pdf', dpi=300, transparent=False)
-
-    # plot results:
-    plt.rc('text', usetex=True)
-    plt.rc('font', family='serif')
-    fig, ax = plt.subplots(figsize=(8, 8))
-    ax.errorbar(mass_sf, sfr_sf, yerr=sfr_sferr, xerr=mass_sferr, fmt="o", markersize=1, linewidth=0.5, mew=1, capsize=0,
-                mec='lightsteelblue', mfc="lightsteelblue", ecolor='lightsteelblue', label="GAMA star forming",
-                zorder=1)
-    ax.errorbar(mass_rc, sfr_rc, yerr=sfr_rcerr, xerr=mass_rcerr, fmt="o", markersize=1, linewidth=0.5, mew=1,
-                capsize=0,
-                mec='cornflowerblue', mfc="cornflowerblue", ecolor='cornflowerblue', label="GAMA red sequence",
-                zorder=2)
-
-    ax.scatter(m_bin, sfr_histmin, zorder=4, c='k')
-    ax.plot(x_scale, y_best, c="r", linewidth=1.5, label='Best fit (MCMC)', zorder=3)
-    ax.plot(x_scale, y_best2, c="g", linewidth=1.5, label='Best fit before (MCMC)', zorder=3)
-    ax.plot(x_scale, y_div, c="k", linewidth=1.5, label='Linear', zorder=3)
-    ax.plot(x_scale, y_bestRC, c='m', zorder=3)
-
-    leg = ax.legend(fancybox=True, prop={'size': 14})
-    leg.get_frame().set_alpha(1.0)
-    ax.set_ylabel("$\mathrm{log\, SFR\, [M_{\odot}\, yr^{-1}]}$", fontsize=16)
-    ax.set_xlabel("$\mathrm{log\, M_{*}\, [M_\odot]}$", fontsize=16)
-    ax.set_xlim([7, 12])
-    plt.savefig('MS2.pdf', format='pdf', dpi=300, transparent=False)
-
-    # creating bins along main sequence:
-    binsms = np.linspace(7.5, 11, 15)
-    m_bin, sfr_bin, err_bin = [], [], []
-    for i in range(1, len(binsms)):
-        # print (bins)7.5, 11, 15
-        inbin = MainSequence[(MainSequence['logM*'] >= binsms[i - 1]) & (MainSequence['logM*'] < binsms[i])]
-        m_bin.append((binsms[i] + binsms[i - 1]) / 2)
-        sfr_bin.append(np.median(inbin['logSFR']))
-        err_bin.append(np.std(inbin['logSFR']))
-    m_bin, sfr_bin, err_bin = np.array(m_bin), np.array(sfr_bin), np.array(err_bin)
-
-    # creating bins along red sequence:
-    binsrc = np.linspace(8.5, 11.3, 15)
-    m_binrc, sfr_binrc, err_binrc = [], [], []
-    for i in range(1, len(binsrc)):
-        # print (bins)
-        inbin = RedCloud[(RedCloud['logM*'] >= binsrc[i - 1]) & (RedCloud['logM*'] < binsrc[i])]
-        m_binrc.append((binsrc[i] + binsrc[i - 1]) / 2)
-        sfr_binrc.append(np.median(inbin['logSFR']))
-        err_binrc.append(np.std(inbin['logSFR']))
-    m_binrc, sfr_binrc, err_binrc = np.array(m_binrc), np.array(sfr_binrc), np.array(err_binrc)
-
-    plt.rc('text', usetex=True)
-    plt.rc('font', family='serif')
-    fig, ax = plt.subplots(figsize=(8, 8))
-    ax.errorbar(mass_sf, sfr_sf, yerr=sfr_sferr, xerr=mass_sferr, fmt="o", markersize=1, linewidth=0.5, mew=1,
-                capsize=0,
-                mec='lightsteelblue', mfc="lightsteelblue", ecolor='lightsteelblue', label="GAMA star forming",
-                zorder=1)
-
-
-    ax.errorbar(m_bin, sfr_bin, yerr=err_bin, fmt="o", markersize=6, linewidth=1, mew=1.5, capsize=3,
-                capthick=1, mec='midnightblue', mfc="cornflowerblue", ecolor='midnightblue', label="GAMA binned",
-                zorder=4)
-
-    ax.plot(x_scale, y_best, c="k", linewidth=1.5, label='Best fit (MCMC)', zorder=3)
-    ax.plot(x_scale, y_best2, c="g", linewidth=1.5, label='Best fit before (MCMC)', zorder=3)
-    ax.fill_between(x_scale, shading1[0], shading1[1], facecolor='plum', zorder=2)
-
-
-    leg = ax.legend(fancybox=True, prop={'size': 14})
-    leg.get_frame().set_alpha(1.0)
-    ax.set_ylabel("$\mathrm{log\, SFR\, [M_{\odot}\, yr^{-1}]}$", fontsize=16)
-    ax.set_xlabel("$\mathrm{log\, M_{*}\, [M_\odot]}$", fontsize=16)
-    ax.set_xlim([7, 12])
-    plt.savefig('MS22.pdf', format='pdf', dpi=300, transparent=False)
-
-    plt.rc('text', usetex=True)
-    plt.rc('font', family='serif')
-    fig, ax = plt.subplots(figsize=(8, 8))
-    ax.errorbar(mass_rc, sfr_rc, yerr=sfr_rcerr, xerr=mass_rcerr, fmt="o", markersize=1, linewidth=0.5, mew=1,
-                capsize=0,
-                mec='cornflowerblue', mfc="cornflowerblue", ecolor='cornflowerblue', label="GAMA red sequence",
-                zorder=2)
-
-    ax.errorbar(m_binrc, sfr_binrc, yerr=err_binrc, fmt="o", markersize=6, linewidth=1, mew=1.5, capsize=3,
-                capthick=1, mec='midnightblue', mfc="cornflowerblue", ecolor='midnightblue', label="GAMA binned",
-                zorder=4)
-
-    ax.plot(x_scale, y_bestRC, c='k', zorder=3, label="Red Sequence")
-
-    ax.fill_between(x_scale, shading2[0], shading2[1], facecolor='plum', zorder=2)
-
-    leg = ax.legend(fancybox=True, prop={'size': 14})
-    leg.get_frame().set_alpha(1.0)
-    ax.set_ylabel("$\mathrm{log\, SFR\, [M_{\odot}\, yr^{-1}]}$", fontsize=16)
-    ax.set_xlabel("$\mathrm{log\, M_{*}\, [M_\odot]}$", fontsize=16)
-    ax.set_xlim([7, 12])
-    plt.savefig('RC22.pdf', format='pdf', dpi=300, transparent=False)
-
 # MAIN PROGRAM #########################################################################################################
 
-#sort_xCOLDGASS()
-#sort_xGASS()
-#sort_GAMA_starforming()
-#sort_GAMA2()
+sort_xCOLDGASS()
+sort_xGASS()
+sort_GAMA_starforming()
