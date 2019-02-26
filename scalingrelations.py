@@ -236,11 +236,11 @@ def sort_xGASS():
     xerr = xGASS['SFRerr_best'].values / (xGASS['SFR_best'].values * np.log(10))  # propagating error into log SFR
     errMHI = np.zeros(len(xGASS))
     yerr = np.zeros(len(xGASS))
-    print(len(ind_det[0])+len(ind_nondet[0]))
+    # print(len(ind_det[0])+len(ind_nondet[0])) # checking we are extracting full sample
     errMHI[ind_det] = ((2.356 * 10E5) / (1 + xGASS['zHI_x'].values[ind_det])) * ((xGASS['Dlum'].values[ind_det]) ** 2) \
-                      * (xGASS['Serr'].values[ind_det]) # calculating MHI error from HI flux error
+                      * (xGASS['Serr'].values[ind_det]) # calculating MHI error from HI line flux error, standard propagation of uncertainties
     yerr[ind_det] = errMHI[ind_det] / ((10 ** mass_HI[ind_det]) * np.log(10)) # propagating MHI error to log
-    yerr[ind_nondet] = 0.09  # non-detections errors
+    yerr[ind_nondet] = 0.09  # non-detections errors (from standard propagation of uncertainties)
     # Building error matrices:
     S_det = S_error(xerr[ind_det], yerr[ind_det])
     S_nondet = S_error(xerr[ind_nondet], yerr[ind_nondet])
