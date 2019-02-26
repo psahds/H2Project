@@ -10,4 +10,4 @@ This is part of a larger study that attempts to determine the cosmic abundance o
 
 This study makes use of the xCOLD GASS survey (http://www.star.ucl.ac.uk/xCOLDGASS), the xGASS survey (http://xgass.icrar.org/data.html) and the GAMA survey (http://www.gama-survey.org/).
 
-This code makes use of the Python package emcee. To download, follow instructions on: http://dfm.io/emcee/current/#
+This code makes use of the Python package emcee (http://dfm.io/emcee/current/#) and corner (https://corner.readthedocs.io/en/latest/index.html).
