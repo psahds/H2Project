@@ -1,4 +1,4 @@
-H2Project
+# H2 Project
 
 This code performs enemble MCMC sampling on 3 scaling relations for local galaxies:
 
