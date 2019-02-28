@@ -52,7 +52,7 @@ def log_probability_SFRMH2(theta, x, y, x2, y2, S, S2, w, w2):
     # considering non-detections:
     I = np.zeros(len(x2))
     for i in range(0,len(x2)):
-        # integrate gaussian from 0 mass to upper limit mass for each non-detection:
+        # integrate gaussian likelihood from 0 mass to upper limit mass for each non-detection:
         I[i] = np.log(((2 * np.pi) ** 0.5) *
                       0.5 * (special.erf((y2[i] - model[i]) / ((2 ** 0.5) * sigma[i])) + 1))
         # note1: the root 2pi factor comes from the fact that we ignore this factor in the ll1 likelihood, so we have to
@@ -99,7 +99,7 @@ def log_probability_SFRMHI(theta, x, y, x2, y2, S, S2, w, w2):
     I = np.zeros(len(x2))
     # considering non-detections:
     for i in range(0,len(x2)):
-        # integrate gaussian from 0 mass to upper limit mass for each non-detection:
+        # integrate gaussian likelihood from 0 mass to upper limit mass for each non-detection:
         I[i] = np.log(((2 * np.pi) ** 0.5) *
                       0.5 * (special.erf((y2[i]-model[i]) / ((2 ** 0.5) * sigma[i])) + 1))
     # calculating likelihood for all non-detections:
@@ -169,28 +169,28 @@ def sort_xCOLDGASS():
     error_H2 = np.zeros(len(xCOLDGASS), dtype=float)
     error_H2[indNoUpperLimit] = xCOLDGASS['LOGMH2_ERR'].values[indNoUpperLimit]
     error_H2[indUpperLimit] = 0.14 # 1sigma error for upper limits
-    # defining indices:
+    # defining indices for detections and non detections, and where values are finite:
     ind_det = np.where((sfr > -6) & (mass_H2 > 6) & (flag_CO == 1))
     ind_nondet = np.where((sfr > -6) & (mass_H2 > 6) & (flag_CO == 2))
     # building matrix of x and y errors:
     S_det = S_error(sfr_err[ind_det], error_H2[ind_det])
     S_nondet = S_error(sfr_err[ind_nondet], error_H2[ind_nondet])
 
-    x_scale = np.linspace(-3,2,100)
+    x_scale = np.linspace(-3,2,100) # x range
 
     # running emcee:
-    ndim, nwalkers = 3, 100
-    initial=np.array([0.7,9.0,-1])
-    pos = [initial + 1e-4*np.random.randn(ndim) for i in range(nwalkers)]
+    ndim, nwalkers = 3, 100 # we will be sampling 3 parameters with 100 walkers
+    initial=np.array([0.7,9.0,-1]) # initial guess where walkers will start
+    pos = [initial + 1e-4*np.random.randn(ndim) for i in range(nwalkers)] # generating first proposal by taking initial guess and adding noise
     sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability_SFRMH2,
                                       args=(sfr[ind_det], mass_H2[ind_det], sfr[ind_nondet], mass_H2[ind_nondet],
                                             S_det, S_nondet, weights[ind_det], weights[ind_nondet]))
-    sampler.run_mcmc(pos, 1000)
-    samples = sampler.chain[:, 200:, :].reshape((-1, ndim))
+    sampler.run_mcmc(pos, 1000) # obtain 1000 samples
+    samples = sampler.chain[:, 200:, :].reshape((-1, ndim)) # get rid of first 200 samples (not converged yet) and flatten list
+    
     plot_corner_SFRMH2(samples) # plotting corner
-    # error shading for fit and best fit:
-    shading = shading_linear(sampler, samples, x_scale)
-    y_best = linfunc(x_scale, np.median(samples[:,0]),np.median(samples[:,1]))
+    shading = shading_linear(sampler, samples, x_scale) # get error shading within 1sigma posteriors
+    y_best = linfunc(x_scale, np.median(samples[:,0]),np.median(samples[:,1])) # best fit, taken with median of samples
 
     # plotting data and emcee fit results:
     plt.rc('text', usetex=True)
@@ -221,22 +221,18 @@ def sort_xGASS():
     # Loading xGASS data:
     xGASS_representative = fits.open('Survey_Data/xGASS_representative_sample.fits') # obtained from http://xgass.icrar.org/data.html
     xGASS_representative = Table(xGASS_representative[1].data).to_pandas()
-    xGASS_errors = fits.open('Survey_Data/xGASS_RS_final_Serr_180903.fits') # obtained through private communication
+    xGASS_errors = fits.open('Survey_Data/xGASS_RS_final_Serr_180903.fits') # obtained through private communication with xGASS team
     xGASS_errors = Table(xGASS_errors[1].data).to_pandas()
-    print(xGASS_errors.columns)
-
-    xGASS = pd.merge(xGASS_representative, xGASS_errors, left_index = True, right_index = True, how = 'outer')
-
-    sfr, mass_HI, flag = np.log10(xGASS['SFR_best'].values), xGASS['lgMHI_x'].values, xGASS['HIsrc_x'].values
-    weights = xGASS['weight'].values
-    # Taking indices:
-    ind_det = np.where((xGASS['SFR_best'] > -80) & (flag != 4))
-    ind_nondet = np.where((xGASS['SFR_best'] > -80) & (flag == 4))
+    xGASS = pd.merge(xGASS_representative, xGASS_errors, left_index = True, right_index = True, how = 'outer') # merging all data
+    # obtaining desired quantities:
+    sfr, mass_HI, flag, weights = np.log10(xGASS['SFR_best'].values), xGASS['lgMHI_x'].values, xGASS['HIsrc_x'].values, xGASS['weight'].values
+    # Taking indices of detections and non detections, and finite values of SFR:
+    ind_det = np.where((xGASS['SFR_best'] > -80) & (flag != 4)) # detection
+    ind_nondet = np.where((xGASS['SFR_best'] > -80) & (flag == 4)) # non detection
     # Creating error arrays:
     xerr = xGASS['SFRerr_best'].values / (xGASS['SFR_best'].values * np.log(10))  # propagating error into log SFR
     errMHI = np.zeros(len(xGASS))
     yerr = np.zeros(len(xGASS))
-    # print(len(ind_det[0])+len(ind_nondet[0])) # checking we are extracting full sample
     errMHI[ind_det] = ((2.356 * 10E5) / (1 + xGASS['zHI_x'].values[ind_det])) * ((xGASS['Dlum'].values[ind_det]) ** 2) \
                       * (xGASS['Serr'].values[ind_det]) # calculating MHI error from HI line flux error, standard propagation of uncertainties
     yerr[ind_det] = errMHI[ind_det] / ((10 ** mass_HI[ind_det]) * np.log(10)) # propagating MHI error to log
@@ -246,17 +242,17 @@ def sort_xGASS():
     S_nondet = S_error(xerr[ind_nondet], yerr[ind_nondet])
 
     # running emcee:
-    ndim, nwalkers = 3, 100
-    initial = np.array([0.7, 9.0, -1])
-    pos = [initial + 1e-4 * np.random.randn(ndim) for i in range(nwalkers)]
+    ndim, nwalkers = 3, 100 # probing 3 parameter spaces with 100 walkers
+    initial = np.array([0.7, 9.0, -1]) # initial guess
+    pos = [initial + 1e-4 * np.random.randn(ndim) for i in range(nwalkers)] # generate first proposal by adding random noise to initial guess
     sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability_SFRMHI,
                                       args=(sfr[ind_det], mass_HI[ind_det], sfr[ind_nondet], mass_HI[ind_nondet],
                                             S_det, S_nondet, weights[ind_det], weights[ind_nondet]))
-    sampler.run_mcmc(pos, 1000)
-    samples = sampler.chain[:, 200:, :].reshape((-1, ndim))
+    sampler.run_mcmc(pos, 1000) # get 1000 samples
+    samples = sampler.chain[:, 200:, :].reshape((-1, ndim)) # discard first 200 samples (not converged yet) and flatten list
     plot_corner_SFRMHI(samples)  # plotting corner
 
-    x_scale = np.linspace(-3.2,2,100)
+    x_scale = np.linspace(-3.2,2,100) # x range
 
     y_best = linfunc(x_scale, np.median(samples[:, 0]), np.median(samples[:, 1]))  # best fit from medians
     shading = shading_linear(sampler, samples, x_scale)  # shading error region on fit
@@ -330,7 +326,7 @@ def shading_MS(sampler_input, samples_input, x_input):
 
 # Plotting corner:
 def plot_corner_MS(samples_input):
-    samples_input[:, 3] = np.exp(samples_input[:, 3])
+    samples_input[:, 3] = np.exp(samples_input[:, 3]) # taking exponent of log scatter
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
     corner.corner(samples_input, labels=["a", "b", "c", "f"],
@@ -351,7 +347,7 @@ def sort_GAMA_starforming():
 
     x_scale = np.linspace(7, 12, 100)  # array of x values for main sequence fit
 
-    # creating bins along main sequence:
+    # creating bins (in stellar mass) along main sequence:
     bins = np.linspace(7.5, 11, 15)
     m_bin, sfr_bin, err_bin = [], [], []
     for i in range(1, len(bins)):
@@ -363,12 +359,12 @@ def sort_GAMA_starforming():
     m_bin, sfr_bin, err_bin = np.array(m_bin), np.array(sfr_bin), np.array(err_bin)
 
     # running emcee:
-    ndim, nwalkers = 4, 100
-    initial = np.array([-0.024, 1.3, -12.75, -1])
-    pos = [initial + 1e-4 * np.random.randn(ndim) for i in range(nwalkers)]
+    ndim, nwalkers = 4, 100 # probe 4 parameters with 100 walkers
+    initial = np.array([-0.024, 1.3, -12.75, -1]) # initial guess
+    pos = [initial + 1e-4 * np.random.randn(ndim) for i in range(nwalkers)] # first proposal: initial guess + random noise
     sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability_MS, args=(mass_sf, sfr_sf, mass_sferr, sfr_sferr))
-    sampler.run_mcmc(pos, 1000)
-    samples = sampler.chain[:, 200:, :].reshape((-1, ndim))
+    sampler.run_mcmc(pos, 1000) # get 1000 samples with MCMC
+    samples = sampler.chain[:, 200:, :].reshape((-1, ndim)) # discard first 200 samples (not converged yet) and flatten list
     shading = shading_MS(sampler, samples, x_scale) # creating shading on fit
     y_best = func(x_scale, np.median(samples[:, 0]), np.median(samples[:, 1]), np.median(samples[:, 2])) # best fit
 
