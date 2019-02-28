@@ -25,12 +25,14 @@ def linfunc(xdata, m, c):
 
 ########## Functions for SFR vs. MH2 linear scaling relation:
 
+
 # Prior (uniform, uninformative):
 def log_prior_SFRMH2(theta):
     m, const, lnf = theta
     if 0 < m < 1 and 8 < const < 10 and -5 < lnf < 5:
         return 0.0
     return -np.inf
+
 
 # Posterior probability:
 def log_probability_SFRMH2(theta, x, y, x2, y2, S, S2, w, w2):
@@ -62,6 +64,7 @@ def log_probability_SFRMH2(theta, x, y, x2, y2, S, S2, w, w2):
     ll2 = np.sum(I + np.log(w2))
     return ll1 + ll2 + log_prior_SFRMH2(theta) # calculating posterior, product of detection & non detection likelihoods and prior
 
+
 # Plotting corner:
 def plot_corner_SFRMH2(samples_input):
     samples_input[:, 2] = np.exp(samples_input[:, 2]) # taking exponent of ln(scatter) to get scatter
@@ -76,12 +79,14 @@ def plot_corner_SFRMH2(samples_input):
 
 ########## Functions for SFR vs. MHI linear scaling relation:
 
+
 # Prior (uniform, uninformative):
 def log_prior_SFRMHI(theta):
     m, const, lnf = theta
     if 0 < m < 10 and 6 < const < 12 and -5 < lnf < 5:
         return 0.0
     return -np.inf
+
 
 # Posterior probability:
 def log_probability_SFRMHI(theta, x, y, x2, y2, S, S2, w, w2):
@@ -105,6 +110,7 @@ def log_probability_SFRMHI(theta, x, y, x2, y2, S, S2, w, w2):
     ll2 = np.sum(I + np.log(w2))
     return ll1 + ll2 + log_prior_SFRMHI(theta) # calculating posterior, product of detection & non detection likelihoods and prior
 
+
 # Plotting corner:
 def plot_corner_SFRMHI(samples_input):
     samples_input[:, 2] = np.exp(samples_input[:, 2])
@@ -118,6 +124,7 @@ def plot_corner_SFRMHI(samples_input):
 
 
 ########## Functions for both SFR vs. MH2 and SFR vs. MHI relations:
+
 
 # Building x- and y-error matrix (in our case it is diagonal since errors aren't correlated)
 def S_error(x_err,y_err):
@@ -215,6 +222,7 @@ def sort_xCOLDGASS():
     ax.set_ylim([7, 11])
     plt.savefig('sfrH2.pdf', format='pdf', dpi=300, transparent=False)
 
+    
 # Sorting xGASS data (SFR vs. MHI):
 def sort_xGASS():
     # Loading xGASS data:
@@ -283,9 +291,11 @@ def sort_xGASS():
 
 ########## Functions for main sequence of star forming galaxies (Stellar mass vs. SFR):
 
+
 # Second order polynomial fitting:
 def func(x,a,b,c):
     return (a * (x**2)) + (b * x) + c
+
 
 # Prior (uniform, uninformative):
 def log_prior_MS(theta):
@@ -293,6 +303,7 @@ def log_prior_MS(theta):
     if -1.5 < a < 1.5 and 0 < b < 4 and -20 < c < -1 and -5 < lnf < 10:
         return 0.0
     return -np.inf
+
 
 # Posterior probability:
 def log_probability_MS(theta, x, y, xerr, yerr):
@@ -304,6 +315,7 @@ def log_probability_MS(theta, x, y, xerr, yerr):
     # calculating log likelihood function:
     ll = -0.5 * np.sum(deltaN ** 2 / sigma2 + np.log(sigma2))
     return ll + log_prior_MS(theta) # returns posterior (prior times likelihood)
+
 
 # Defining error shading for fit on scaling relation plot:
 def shading_MS(sampler_input, samples_input, x_input):
@@ -323,6 +335,7 @@ def shading_MS(sampler_input, samples_input, x_input):
     y_min = np.array(y_min)
     return y_max, y_min
 
+
 # Plotting corner:
 def plot_corner_MS(samples_input):
     samples_input[:, 3] = np.exp(samples_input[:, 3]) # taking exponent of log scatter
@@ -334,6 +347,7 @@ def plot_corner_MS(samples_input):
                   truth_color="k", quantiles=[0.16, 0.84], show_titles=True, title_kwargs={"fontsize": 12})
     plt.savefig('MScorner.pdf', format='pdf', dpi=300, transparent=False)
 
+    
 # Sorting GAMA data (Main Sequence of star forming galaxies):
 def sort_GAMA_starforming():
     GAMA = pd.read_csv('Survey_Data/GAMA_sample.dat', comment='#', header=None, sep=r"\s*", engine="python") # loading GAMA data
