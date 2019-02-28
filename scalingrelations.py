@@ -1,3 +1,6 @@
+############################################# H2 Project Scaling Relations #############################################
+
+# Importing necessary modules:
 import numpy as np
 import matplotlib
 matplotlib.use('TkAgg')
