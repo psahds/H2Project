@@ -348,7 +348,7 @@ def plot_corner_MS(samples_input):
     plt.savefig('MScorner.pdf', format='pdf', dpi=300, transparent=False)
 
     
-# Sorting GAMA data (Main Sequence of star forming galaxies):
+# Sorting GAMA data (Main Sequence of star forming galaxies, stellar mass vs. SFR):
 def sort_GAMA_starforming():
     GAMA = pd.read_csv('Survey_Data/GAMA_sample.dat', comment='#', header=None, sep=r"\s*", engine="python") # loading GAMA data
     GAMA.columns = ['ID', 'z', 'logM*', 'logM*err', 'logSFR', 'logSFRerr', 'ColorFlag'] # taking columns
