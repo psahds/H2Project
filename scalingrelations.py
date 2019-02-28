@@ -9,10 +9,6 @@ import pandas as pd
 from astropy.io import fits
 from astropy.table import Table
 from pylab import *
-from scipy.optimize import curve_fit
-from sklearn import mixture
-import itertools
-import atpy
 
 
 # FUNCTIONS ############################################################################################################
